@@ -1,0 +1,42 @@
+#ifndef _LIBNYA_JOIN
+#define _LIBNYA_JOIN
+
+#include <concepts>
+#include <iterator>
+#include <nya/concepts>
+#include <ranges>
+#include <string>
+#include <type_traits>
+
+namespace nya {
+
+template <typename T>
+struct is_char {
+    constexpr static bool value = std::is_same_v<T, char> || std::is_same_v<T, signed char> || std::is_same_v<T, unsigned char> || std::is_same_v<T, wchar_t> ||
+                                  std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t> || std::is_same_v<T, char32_t>;
+};
+
+template <typename T>
+struct is_string {
+    constexpr static bool value =
+        (specialized_from<T, std::basic_string> || specialized_from<T, std::basic_string_view> || std::is_pointer_v<std::decay_t<T>>) &&
+        is_char<std::decay_t<std::iter_value_t<T>>>::value;
+};
+
+template <std::ranges::input_range RangeType, typename StringType>
+requires std::constructible_from<std::basic_string<std::iter_value_t<StringType>>, std::ranges::range_value_t<RangeType>> && is_string<StringType>::value
+std::basic_string<std::iter_value_t<StringType>> join_with(RangeType && r, StringType && s) {
+    // if the range is empty, return empty string
+    if (std::ranges::empty(r)) return std::basic_string<std::iter_value_t<StringType>>{};
+
+    auto result = std::basic_string<std::iter_value_t<StringType>>{ *std::ranges::begin(r) };
+    for (auto it = std::ranges::next(std::ranges::begin(r)); it != std::ranges::end(r); ++it) {
+        result += s;
+        result += *it;
+    }
+    return result;
+}
+
+} // namespace nya
+
+#endif // _LIBNYA_JOIN

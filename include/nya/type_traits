@@ -1,0 +1,16 @@
+#ifndef _LIBNYA_TYPE_TRAITS
+#define _LIBNYA_TYPE_TRAITS
+
+#include <type_traits>
+
+namespace nya {
+
+template <typename __Type, template <typename...> typename __Template>
+struct is_specialization_of : std::false_type {};
+
+template <template <typename...> typename __Template, typename... __Args>
+struct is_specialization_of<__Template<__Args...>, __Template> : std::true_type {};
+
+} // namespace nya
+
+#endif // _LIBNYA_TYPE_TRAITS

@@ -1,0 +1,14 @@
+#ifndef _LIBNYA_CONCEPTS
+#define _LIBNYA_CONCEPTS
+
+#include <concepts>
+#include <nya/type_traits>
+
+namespace nya {
+
+template <typename __Type, template <typename...> typename __Template>
+concept specialized_from = is_specialization_of<__Type, __Template>::value;
+
+} // namespace nya
+
+#endif // _LIBNYA_CONCEPTS
