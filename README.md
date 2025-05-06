@@ -35,6 +35,8 @@ You need to replace `<target-name>` with your target name.
 
 -   nya/concepts:
 
+    -   `same_after_decay<Type1, Type2>` -> concept
+
     -   `specialized_from<Type, Template>` -> concept
 
     -   `instantiable_with<Template, Args...>` -> concept
@@ -46,3 +48,21 @@ You need to replace `<target-name>` with your target name.
     -   `is_string<Type>` -> type trait
 
     -   `join_with<RangeType, StringType>(RangeType &&, StringType &&)` -> function template
+
+-   nya/cpp_codegen:
+
+    -   `expression` -> class for representing and constructing C++ expressions
+
+    -   `type` -> class for representing and constructing C++ types
+
+    -   `cofstream` -> class for writing C++ file
+
+    -   `expression operator""_expr(const char * str, size_t)` -> suffix for easily creating expression (with precedence `LOWEST`)
+
+    -   `expression operator""_term(const char * str, size_t)` -> suffix for easily creating expression (with precedence `HIGHEST`)
+
+    -   `expression operator""_lit(const char * str, size_t)` -> suffix for easily creating string literal (with precedence `HIGHEST`), ignorable
+
+    -   `type operator""_type(const char * str, size_t)` suffix for easily creating type
+
+    -   `create_cpp_*(...)` -> macros for creating blocks, based on RAII of `cofstream::scope_guard`
