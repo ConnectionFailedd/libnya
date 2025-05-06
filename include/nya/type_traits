@@ -16,10 +16,7 @@ template <template <typename...> typename Template, typename... Args>
 struct is_specialization_of<Template<Args...>, Template> : std::true_type {};
 
 template <template <typename...> typename T, typename... Args>
-struct is_instantiable_with {
-public:
-    static constexpr bool value = requires { typename T<Args...>; };
-};
+struct is_instantiable_with : std::integral_constant<bool, requires { typename T<Args...>; }> {};
 
 template <template <typename...> typename T, std::size_t N, typename Tuple>
 struct __is_template_prefix_equivalent_impl {
