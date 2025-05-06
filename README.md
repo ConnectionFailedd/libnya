@@ -27,9 +27,17 @@ You need to replace `<target-name>` with your target name.
 
     -   `is_specialization_of<Type, Template>` -> type trait
 
+    -   `is_instantiable_with<Template, Args...>` -> type trait
+
+    -   `is_template_prefix_equivalent<Template, N, Args...>` -> type trait
+
+    -   `required_template_args<Template, Args...>` -> type trait
+
 -   nya/concepts:
 
     -   `specialized_from<Type, Template>` -> concept
+
+    -   `instantiable_with<Template, Args...>` -> concept
 
 -   nya/join:
 

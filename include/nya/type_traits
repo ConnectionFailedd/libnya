@@ -1,15 +1,57 @@
 #ifndef _LIBNYA_TYPE_TRAITS
 #define _LIBNYA_TYPE_TRAITS
 
+#include <concepts>
+#include <cstddef>
+#include <tuple>
 #include <type_traits>
+#include <utility>
 
 namespace nya {
 
-template <typename __Type, template <typename...> typename __Template>
+template <typename Type, template <typename...> typename Template>
 struct is_specialization_of : std::false_type {};
 
-template <template <typename...> typename __Template, typename... __Args>
-struct is_specialization_of<__Template<__Args...>, __Template> : std::true_type {};
+template <template <typename...> typename Template, typename... Args>
+struct is_specialization_of<Template<Args...>, Template> : std::true_type {};
+
+template <template <typename...> typename T, typename... Args>
+struct is_instantiable_with {
+public:
+    static constexpr bool value = requires { typename T<Args...>; };
+};
+
+template <template <typename...> typename T, std::size_t N, typename Tuple>
+struct __is_template_prefix_equivalent_impl {
+private:
+    template <std::size_t... I, std::size_t... J>
+    static std::true_type test_(std::index_sequence<I...>, std::index_sequence<J...>)
+    requires is_instantiable_with<T, std::tuple_element_t<I, Tuple>...>::value
+             && std::same_as<T<std::tuple_element_t<I, Tuple>...>, T<std::tuple_element_t<J, Tuple>...>>;
+    static std::false_type test_(...);
+
+public:
+    static constexpr bool value = decltype(test_(std::make_index_sequence<N>{}, std::make_index_sequence<std::tuple_size_v<Tuple>>{}))::value;
+};
+
+template <template <typename...> typename T, std::size_t N, typename... Args>
+using is_template_prefix_equivalent = __is_template_prefix_equivalent_impl<T, N, std::tuple<Args...>>;
+
+template <template <typename...> typename T, std::size_t N, typename... Args>
+struct __required_template_args_impl {
+private:
+    static constexpr std::size_t test_() {
+        if constexpr (N == sizeof...(Args)) { return N; }
+        else if constexpr (is_template_prefix_equivalent<T, N, Args...>::value) { return N; }
+        else { return __required_template_args_impl<T, N + 1, Args...>::value; }
+    }
+
+public:
+    static constexpr std::size_t value = test_();
+};
+
+template <template <typename...> typename T, typename... Args>
+using required_template_args = __required_template_args_impl<T, 0UL, Args...>;
 
 } // namespace nya
 

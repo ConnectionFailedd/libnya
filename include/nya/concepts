@@ -6,8 +6,11 @@
 
 namespace nya {
 
-template <typename __Type, template <typename...> typename __Template>
-concept specialized_from = is_specialization_of<__Type, __Template>::value;
+template <typename Type, template <typename...> typename Template>
+concept specialized_from = is_specialization_of<Type, Template>::value;
+
+template <template <typename...> typename T, typename... Args>
+concept instantiable_with = is_instantiable_with<T, Args...>::value;
 
 } // namespace nya
 

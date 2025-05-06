@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(libnya VERSION 1.0 LANGUAGES CXX)
+project(libnya VERSION 1.0.1 LANGUAGES CXX)
 
 # 定义 header-only 接口库
 add_library(libnya INTERFACE)
