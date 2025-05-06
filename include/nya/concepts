@@ -6,6 +6,9 @@
 
 namespace nya {
 
+template <typename T, typename U>
+concept same_after_decay = std::same_as<std::decay_t<T>, std::decay_t<U>>;
+
 template <typename Type, template <typename...> typename Template>
 concept specialized_from = is_specialization_of<Type, Template>::value;
 

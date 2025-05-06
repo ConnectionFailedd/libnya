@@ -1,0 +1,417 @@
+#ifndef _LIBNYA_CPP_CODEGEN
+#define _LIBNYA_CPP_CODEGEN
+
+#include <concepts>
+#include <cstddef>
+#include <fstream>
+#include <nya/join>
+#include <optional>
+#include <ostream>
+#include <ranges>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+namespace nya {
+
+class expression;
+class type;
+
+class expression {
+    friend type;
+
+public:
+    enum class precedence {
+        LOWEST = 0,
+        COMMA = 1,
+        ASSIGN = 2,
+        LOGICAL_OR = 3,
+        LOGICAL_AND = 4,
+        BITWISE_OR = 5,
+        BITWISE_XOR = 6,
+        BITWISE_AND = 7,
+        EQUALITY = 8,
+        COMPARISON = 9,
+        SHIFT = 10,
+        SUM = 11,
+        PRODUCT = 12,
+        PREFIX = 13,
+        SUFFIX = 14,
+        HIGHEST = 15
+    };
+
+private:
+    std::string expression_;
+    precedence precedence_;
+
+public:
+    // create an expression with given precedence
+    // ! Note: Different from the `expression(std::string string_literal)`
+    expression(std::string expression, precedence precedence) : expression_(std::move(expression)), precedence_(precedence) {}
+
+    // create literals
+    expression(int value) : expression_(std::to_string(value)), precedence_(precedence::HIGHEST) {}
+    expression(unsigned int value) : expression_(std::to_string(value) + 'U'), precedence_(precedence::HIGHEST) {}
+    expression(long value) : expression_(std::to_string(value) + 'L'), precedence_(precedence::HIGHEST) {}
+    expression(unsigned long value) : expression_(std::to_string(value) + "UL"), precedence_(precedence::HIGHEST) {}
+    expression(long long value) : expression_(std::to_string(value) + "LL"), precedence_(precedence::HIGHEST) {}
+    expression(unsigned long long value) : expression_(std::to_string(value) + "ULL"), precedence_(precedence::HIGHEST) {}
+    expression(float value) : expression_(std::to_string(value) + 'F'), precedence_(precedence::HIGHEST) {}
+    expression(double value) : expression_(std::to_string(value)), precedence_(precedence::HIGHEST) {}
+    expression(long double value) : expression_(std::to_string(value) + 'L'), precedence_(precedence::HIGHEST) {}
+    expression(char value) : expression_("'" + std::string(1, value) + "'"), precedence_(precedence::HIGHEST) {}
+    expression(const char * value) : expression_("\"" + std::string(value) + "\""), precedence_(precedence::HIGHEST) {}
+    expression(const std::string & value) : expression_("\"" + value + "\""), precedence_(precedence::HIGHEST) {}
+    expression(std::string_view value) : expression_("\"" + std::string(value) + "\""), precedence_(precedence::HIGHEST) {}
+    expression(bool value) : expression_(value ? "true" : "false"), precedence_(precedence::HIGHEST) {}
+    expression(std::nullptr_t) : expression_("nullptr"), precedence_(precedence::HIGHEST) {}
+
+    expression(const expression & other) : expression_(other.expression_), precedence_(other.precedence_) {}
+    expression(expression && other) noexcept : expression_(std::move(other.expression_)), precedence_(other.precedence_) {}
+
+    const std::string & to_string() const { return expression_; }
+    expression parenthesize() const { return expression("(" + expression_ + ")", precedence::HIGHEST); }
+
+    expression & assign(const expression & rhs) {
+        expression_ = rhs.expression_;
+        precedence_ = precedence::ASSIGN;
+        return *this;
+    }
+    expression & assign(expression && rhs) noexcept {
+        expression_ = std::move(rhs.expression_);
+        precedence_ = precedence::ASSIGN;
+        return *this;
+    }
+
+
+    // ? No need to overload `operator=(expression &&)`
+    // ? Because this `operator=` is not assign function in normal sense, no move semantics can be used
+    expression operator=(const expression & other) {
+        auto left = precedence_ < precedence::ASSIGN ? "(" + expression_ + ")" : expression_;
+        auto right = other.precedence_ < precedence::ASSIGN ? "(" + other.expression_ + ")" : other.expression_;
+        return expression(left + " = " + right, precedence::ASSIGN);
+    }
+    expression operator-() const {
+        auto left = precedence_ < precedence::PREFIX ? "(" + expression_ + ")" : expression_;
+        return expression("-" + left, precedence::PREFIX);
+    }
+    expression operator+() const {
+        auto left = precedence_ < precedence::PREFIX ? "(" + expression_ + ")" : expression_;
+        return expression("+" + left, precedence::PREFIX);
+    }
+    expression operator~() const {
+        auto left = precedence_ < precedence::PREFIX ? "(" + expression_ + ")" : expression_;
+        return expression("~" + left, precedence::PREFIX);
+    }
+    expression operator!() const {
+        auto left = precedence_ < precedence::PREFIX ? "(" + expression_ + ")" : expression_;
+        return expression("!" + left, precedence::PREFIX);
+    }
+    expression operator++() const {
+        if (precedence_ < precedence::PREFIX) { return expression("++(" + expression_ + ")", precedence::PREFIX); }
+        return expression("++" + expression_, precedence::PREFIX);
+    }
+    expression operator--() const {
+        if (precedence_ < precedence::PREFIX) { return expression("--(" + expression_ + ")", precedence::PREFIX); }
+        return expression("--" + expression_, precedence::PREFIX);
+    }
+    expression operator&() const {
+        if (precedence_ < precedence::PREFIX) { return expression("&(" + expression_ + ")", precedence::PREFIX); }
+        return expression("&" + expression_, precedence::PREFIX);
+    }
+    expression operator*() const {
+        if (precedence_ < precedence::PREFIX) { return expression("*(" + expression_ + ")", precedence::PREFIX); }
+        return expression("*" + expression_, precedence::PREFIX);
+    }
+    expression operator++(int) const {
+        auto left = precedence_ < precedence::SUFFIX ? "(" + expression_ + ")" : expression_;
+        return expression(left + "++", precedence::SUFFIX);
+    }
+    expression operator--(int) const {
+        auto left = precedence_ < precedence::SUFFIX ? "(" + expression_ + ")" : expression_;
+        return expression(left + "--", precedence::SUFFIX);
+    }
+    expression operator[](const expression & index) const {
+        auto left = precedence_ < precedence::SUFFIX ? "(" + expression_ + ")" : expression_;
+        auto right = index.precedence_ == precedence::COMMA ? "(" + index.expression_ + ")" : index.expression_;
+        return expression(left + "[" + right + "]", precedence::SUFFIX);
+    }
+    expression operator()() const {
+        auto left = precedence_ < precedence::SUFFIX ? "(" + expression_ + ")" : expression_;
+        return expression(left + "()", precedence::SUFFIX);
+    }
+    template <std::convertible_to<expression> T, typename... Args>
+    requires (std::convertible_to<Args, expression> && ...)
+    expression operator()(T && first_arg, Args &&... rest_args) const {
+        auto left = precedence_ < precedence::SUFFIX ? "(" + expression_ + ")" : expression_;
+        auto arg_to_string = [](const expression & arg) { return arg.precedence_ == precedence::COMMA ? "(" + arg.expression_ + ")" : arg.expression_; };
+        return expression(left + "(" + (arg_to_string(first_arg) + ... + (", " + arg_to_string(rest_args))) + ")", precedence::SUFFIX);
+    }
+
+    friend expression operator,(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::COMMA ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::COMMA ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + ", " + right, precedence::COMMA);
+    }
+    friend expression operator+=(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::ASSIGN ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::ASSIGN ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " += " + right, precedence::ASSIGN);
+    }
+    friend expression operator-=(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::ASSIGN ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::ASSIGN ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " -= " + right, precedence::ASSIGN);
+    }
+    friend expression operator*=(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::ASSIGN ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::ASSIGN ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " *= " + right, precedence::ASSIGN);
+    }
+    friend expression operator/=(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::ASSIGN ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::ASSIGN ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " /= " + right, precedence::ASSIGN);
+    }
+    friend expression operator%=(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::ASSIGN ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::ASSIGN ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " %= " + right, precedence::ASSIGN);
+    }
+    friend expression operator&=(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::ASSIGN ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::ASSIGN ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " &= " + right, precedence::ASSIGN);
+    }
+    friend expression operator|=(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::ASSIGN ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::ASSIGN ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " |= " + right, precedence::ASSIGN);
+    }
+    friend expression operator^=(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::ASSIGN ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::ASSIGN ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " ^= " + right, precedence::ASSIGN);
+    }
+    friend expression operator<<=(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::ASSIGN ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::ASSIGN ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " <<= " + right, precedence::ASSIGN);
+    }
+    friend expression operator>>=(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::ASSIGN ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::ASSIGN ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " >>= " + right, precedence::ASSIGN);
+    }
+    friend expression operator||(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::LOGICAL_OR ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::LOGICAL_OR ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " || " + right, precedence::LOGICAL_OR);
+    }
+    friend expression operator&&(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::LOGICAL_AND ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::LOGICAL_AND ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " && " + right, precedence::LOGICAL_AND);
+    }
+    friend expression operator|(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::BITWISE_OR ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::BITWISE_OR ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " | " + right, precedence::BITWISE_OR);
+    }
+    friend expression operator^(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::BITWISE_XOR ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::BITWISE_XOR ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " ^ " + right, precedence::BITWISE_XOR);
+    }
+    friend expression operator&(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::BITWISE_AND ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::BITWISE_AND ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " & " + right, precedence::BITWISE_AND);
+    }
+    friend expression operator==(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::EQUALITY ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::EQUALITY ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " == " + right, precedence::EQUALITY);
+    }
+    friend expression operator!=(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::EQUALITY ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::EQUALITY ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " != " + right, precedence::EQUALITY);
+    }
+    friend expression operator<(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::COMPARISON ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::COMPARISON ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " < " + right, precedence::COMPARISON);
+    }
+    friend expression operator<=(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::COMPARISON ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::COMPARISON ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " <= " + right, precedence::COMPARISON);
+    }
+    friend expression operator>(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::COMPARISON ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::COMPARISON ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " > " + right, precedence::COMPARISON);
+    }
+    friend expression operator>=(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::COMPARISON ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::COMPARISON ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " >= " + right, precedence::COMPARISON);
+    }
+    friend expression operator<<(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::SHIFT ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::SHIFT ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " << " + right, precedence::SHIFT);
+    }
+    friend expression operator>>(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::SHIFT ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::SHIFT ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " >> " + right, precedence::SHIFT);
+    }
+    friend expression operator+(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::SUM ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::SUM ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " + " + right, precedence::SUM);
+    }
+    friend expression operator-(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::SUM ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::SUM ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " - " + right, precedence::SUM);
+    }
+    friend expression operator*(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::PRODUCT ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::PRODUCT ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " * " + right, precedence::PRODUCT);
+    }
+    friend expression operator/(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::PRODUCT ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::PRODUCT ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " / " + right, precedence::PRODUCT);
+    }
+    friend expression operator%(const expression & lhs, const expression & rhs) {
+        auto left = lhs.precedence_ < precedence::PRODUCT ? "(" + lhs.expression_ + ")" : lhs.expression_;
+        auto right = rhs.precedence_ < precedence::PRODUCT ? "(" + rhs.expression_ + ")" : rhs.expression_;
+        return expression(left + " % " + right, precedence::PRODUCT);
+    }
+};
+
+class type {
+private:
+    std::string type_;
+
+public:
+    type(const std::string & type) : type_(type) {}
+    type(const type & other) : type_(other.type_) {}
+    type(type && other) noexcept : type_(std::move(other.type_)) {}
+
+    const std::string & to_string() const { return type_; }
+
+    expression operator()() const { return expression(type_ + "()", expression::precedence::HIGHEST); }
+    template <std::convertible_to<expression> T, typename... Args>
+    requires (std::convertible_to<Args, expression> && ...)
+    expression operator()(T && first_arg, Args &&... rest_args) const {
+        auto arg_to_string = [](const expression & arg) {
+            return arg.precedence_ == expression::precedence::COMMA ? "(" + arg.expression_ + ")" : arg.expression_;
+        };
+        return expression(type_ + "(" + (arg_to_string(first_arg) + ... + (", " + arg_to_string(rest_args))) + ")", expression::precedence::HIGHEST);
+    }
+    expression operator+(const expression & other) const { return expression(type_ + " " + other.expression_, expression::precedence::HIGHEST); }
+    type operator*() const { return type(type_ + "*"); }
+};
+
+inline std::ostream & operator<<(std::ostream & os, const expression & expr) { return os << expr.to_string(); }
+
+inline std::ostream & operator<<(std::ostream & os, const type & type) { return os << type.to_string(); }
+
+class cofstream : public std::ofstream {
+private:
+    class scope_guard {
+    public:
+        scope_guard(cofstream & stream, std::string end) : stream_(stream), end_(std::move(end)) {}
+
+        ~scope_guard() { stream_.end(end_); }
+
+    private:
+        cofstream & stream_;
+        std::string end_;
+    };
+
+public:
+    cofstream(const std::string & filename) : std::ofstream(filename) {}
+
+    void add_include(const std::string & header) { *this << "#include <" + header + ">" << std::endl; }
+
+    void add_include_user(const std::string & header) { *this << "#include \"" + header + "\"" << std::endl; }
+
+    void add_define(const std::string & macro, const std::optional<std::string> & value = std::nullopt) {
+        *this << "#define " + macro + (value ? " " + *value : "") << std::endl;
+    }
+
+    void add_statement(expression && expr) { *this << expr << ";" << std::endl; }
+
+    void add_return(expression && expr) { *this << "return " << expr << +";" << std::endl; }
+
+    void add_line(const std::string & line = "") { *this << line << std::endl; }
+
+    void add_inline_comment(const std::string & comment) { *this << "// " + comment << std::endl; }
+
+    scope_guard create_conditional_compilation_guard(const std::string & condition) { return create_guard_("#if " + condition, "#endif // " + condition); }
+
+    scope_guard create_indentation_guard() { return create_guard_("{", "}"); }
+
+    scope_guard create_function_guard(const type & return_type, const expression & function, const std::vector<expression> & args = {}) {
+        auto joined_args = nya::join_with(args | std::views::transform([](auto & arg) { return arg.to_string(); }), ", ");
+        return create_guard_(return_type.to_string() + " " + function.to_string() + "(" + joined_args + ") {");
+    }
+
+    scope_guard create_class_guard(const std::string & class_name, const std::vector<std::pair<std::string, std::string>> & base_classes = {}) {
+        auto joined_base_classes = nya::join_with(base_classes | std::views::transform([](auto & cls) { return cls.first + " " + cls.second; }), ", ");
+        return create_guard_("class " + class_name + (base_classes.empty() ? "" : " : " + joined_base_classes) + " {", "};");
+    }
+
+    scope_guard create_namespace_guard(const std::string & namespace_name) { return create_guard_("namespace " + namespace_name + " {"); }
+
+    scope_guard create_if_guard(const expression & condition) { return create_guard_("if (" + condition.to_string() + ") {"); }
+
+    scope_guard create_else_guard() { return create_guard_("else {"); }
+
+    scope_guard create_else_if_guard(const expression & condition) { return create_guard_("else if (" + condition.to_string() + ") {"); }
+
+    scope_guard create_while_guard(const expression & condition) { return create_guard_("while (" + condition.to_string() + ") {"); }
+
+    scope_guard create_for_guard(const expression & init, const expression & condition, const expression & increment) {
+        return create_guard_("for (" + init.to_string() + "; " + condition.to_string() + "; " + increment.to_string() + ") {");
+    }
+
+private:
+    scope_guard create_guard_(const std::string & begin, const std::string & end = "}") {
+        *this << begin << std::endl;
+        return scope_guard(*this, end);
+    }
+
+    void end(const std::string & end) { *this << end << std::endl; }
+};
+
+} // namespace nya
+
+inline nya::expression operator""_expr(const char * str, size_t) { return nya::expression(str, nya::expression::precedence::LOWEST); }
+
+inline nya::expression operator""_term(const char * str, size_t) { return nya::expression(str, nya::expression::precedence::HIGHEST); }
+
+inline nya::expression operator""_lit(const char * str, size_t) { return nya::expression(str); }
+
+inline nya::type operator""_type(const char * str, size_t) { return nya::type(str); }
+
+#define create_cpp_conditional_compilation(cpp_ofstream, condition) if (auto guard = cpp_ofstream.create_conditional_compilation_guard(condition); true)
+#define create_cpp_indentation(cpp_ofstream) if (auto guard = cpp_ofstream.create_indentation_guard(); true)
+#define create_cpp_function(cpp_ofstream, return_type, name, args...) if (auto guard = cpp_ofstream.create_function_guard(return_type, name, args); true)
+#define create_cpp_class(cpp_ofstream, class_name, base_classes...) if (auto guard = cpp_ofstream.create_class_guard(class_name, base_classes); true)
+#define create_cpp_namespace(cpp_ofstream, namespace_name) if (auto guard = cpp_ofstream.create_namespace_guard(namespace_name); true)
+#define create_cpp_if(cpp_ofstream, condition) if (auto guard = cpp_ofstream.create_if_guard(condition); true)
+#define create_cpp_else(cpp_ofstream) if (auto guard = cpp_ofstream.create_else_guard(); true)
+#define create_cpp_while(cpp_ofstream, condition) if (auto guard = cpp_ofstream.create_while_guard(condition); true)
+#define create_cpp_for(cpp_ofstream, init, condition, increment) if (auto guard = cpp_ofstream.create_for_guard(init, condition, increment); true)
+
+#endif // _LIBNYA_CPP_CODEGEN
