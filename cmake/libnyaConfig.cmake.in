@@ -1,2 +1,3 @@
 @PACKAGE_INIT@
 include("${CMAKE_CURRENT_LIST_DIR}/libnyaTargets.cmake")
+message(STATUS "Found libnya: ${CMAKE_CURRENT_LIST_DIR}/libnyaConfig.cmake (found version \"${PROJECT_VERSION}\")")
