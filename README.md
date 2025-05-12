@@ -77,4 +77,4 @@ You need to replace `<target-name>` with your target name.
 
     -   `size_t align(size_t size, size_t alignment)` -> function for aligning size up to alignment
 
-    -   `observe_ptr<Type>` -> class standing for a pointer that doesn't hold the resource
+    -   `observer_ptr<Type>` -> class standing for a pointer that doesn't hold the resource
