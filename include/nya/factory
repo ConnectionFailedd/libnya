@@ -1,0 +1,46 @@
+#ifndef _LIBNYA_FACTORY
+#define _LIBNYA_FACTORY
+
+#include <any>
+#include <functional>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
+
+namespace nya {
+
+template <typename Base>
+class factory {
+public:
+    using pointer = Base *;
+    using const_pointer = const Base *;
+    using reference = Base &;
+    using const_reference = const Base &;
+
+    using create_fn_t = std::function<pointer(const std::any &)>;
+
+    static void register_class(const std::string & class_name, create_fn_t create_fn) { get_map_()[class_name] = create_fn; }
+
+    static pointer create(const std::string & class_name, const std::any & args) {
+        auto it = get_map_().find(class_name);
+        if (it == get_map_().end()) { throw std::runtime_error("Class " + class_name + " not registered."); }
+        return it->second(args);
+    }
+
+private:
+    static std::unordered_map<std::string, create_fn_t> & get_map_() {
+        static std::unordered_map<std::string, create_fn_t> map_;
+        return map_;
+    }
+};
+
+} // namespace nya
+
+#define REGISTER_CLASS(derived, base)                                                                \
+    inline base * __create_##derived(const std::any & args) { return new derived(args); }            \
+    inline struct __register_##derived {                                                             \
+        __register_##derived() { nya::factory<base>::register_class(#derived, __create_##derived); } \
+    } __register_##derived##_instance;
+
+#endif // _LIBNYA_FACTORY

@@ -66,3 +66,9 @@ You need to replace `<target-name>` with your target name.
     -   `type operator""_type(const char * str, size_t)` suffix for easily creating type
 
     -   `create_cpp_*(...)` -> macros for creating blocks, based on RAII of `cofstream::scope_guard`
+
+-   nya/factory:
+
+    -   `factory<Type>` -> Factory class of `Type`
+
+    -   `REGISTER_CLASS(DerivedType, BaseType)` -> macro for registering class `DerivedType` to `factory<BaseType>`
