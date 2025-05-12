@@ -1,0 +1,37 @@
+#ifndef _LIBNYA_MEMORY
+#define _LIBNYA_MEMORY
+
+#include <cstddef>
+
+namespace nya {
+
+constexpr std::size_t align_up(std::size_t size, std::size_t alignment) { return (size + alignment - 1) & ~(alignment - 1); }
+
+template<typename T>
+class observer_ptr {
+public:
+    using element_type = T;
+    using pointer = T *;
+    using reference = T &;
+
+    observer_ptr(pointer ptr) : ptr(ptr) {}
+    observer_ptr(const observer_ptr &) = default;
+    observer_ptr(observer_ptr &&) = default;
+    observer_ptr & operator=(const observer_ptr &) = default;
+    observer_ptr & operator=(observer_ptr &&) = default;
+    ~observer_ptr() = default;
+
+    pointer get() const { return ptr; }
+    void reset(pointer ptr = nullptr) { this->ptr = ptr; }
+    pointer operator->() const { return ptr; }
+    reference operator*() const { return *ptr; }
+    bool operator==(const observer_ptr & other) const { return ptr == other.ptr; }
+    bool operator!=(const observer_ptr & other) const { return ptr != other.ptr; }
+
+private:
+    pointer ptr;
+};
+
+} // namespace nya
+
+#endif // _LIBNYA_MEMORY

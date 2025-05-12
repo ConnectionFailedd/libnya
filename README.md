@@ -69,6 +69,12 @@ You need to replace `<target-name>` with your target name.
 
 -   nya/factory:
 
-    -   `factory<Type>` -> Factory class of `Type`
+    -   `factory<Type>` -> factory class of `Type`
 
     -   `REGISTER_CLASS(DerivedType, BaseType)` -> macro for registering class `DerivedType` to `factory<BaseType>`
+
+-   nya/memory:
+
+    -   `size_t align(size_t size, size_t alignment)` -> function for aligning size up to alignment
+
+    -   `observe_ptr<Type>` -> class standing for a pointer that doesn't hold the resource
