@@ -24,11 +24,102 @@ public:
     ~observer_ptr() = default;
 
     pointer get() const { return ptr; }
+    pointer operator->() const { return ptr; }
+    reference operator*() const { return *ptr; }
+    bool operator==(const observer_ptr & other) const { return ptr == other.ptr; }
+    bool operator!=(const observer_ptr & other) const { return ptr != other.ptr; }
+
+private:
+    pointer ptr;
+};
+
+template <typename T>
+class observer_ptr<const T> {
+public:
+    using element_type = T;
+    using pointer = const T *;
+    using reference = const T &;
+
+    observer_ptr() : ptr(nullptr) {}
+    observer_ptr(pointer ptr) : ptr(ptr) {}
+    observer_ptr(const observer_ptr &) = default;
+    observer_ptr(observer_ptr &&) = default;
+    observer_ptr & operator=(const observer_ptr &) = default;
+    observer_ptr & operator=(observer_ptr &&) = default;
+    ~observer_ptr() = default;
+
+    observer_ptr(const observer_ptr<T> & other) : ptr(other.get()) {}
+    observer_ptr & operator=(const observer_ptr<T> & other) {
+        ptr = other.get();
+        return *this;
+    }
+
+    pointer get() const { return ptr; }
+    pointer operator->() const { return ptr; }
+    reference operator*() const { return *ptr; }
+    bool operator==(const observer_ptr & other) const { return ptr == other.ptr; }
+    bool operator!=(const observer_ptr & other) const { return ptr != other.ptr; }
+
+private:
+    pointer ptr;
+};
+
+template <typename T>
+class observer_ptr<T[]> {
+public:
+    using element_type = T;
+    using pointer = T *;
+    using reference = T &;
+
+    observer_ptr() : ptr(nullptr) {}
+    observer_ptr(pointer ptr) : ptr(ptr) {}
+    observer_ptr(const observer_ptr &) = default;
+    observer_ptr(observer_ptr &&) = default;
+    observer_ptr & operator=(const observer_ptr &) = default;
+    observer_ptr & operator=(observer_ptr &&) = default;
+    ~observer_ptr() = default;
+
+    pointer get() const { return ptr; }
+    pointer operator->() const { return ptr; }
+    reference operator*() const { return *ptr; }
+    bool operator==(const observer_ptr & other) const { return ptr == other.ptr; }
+    bool operator!=(const observer_ptr & other) const { return ptr != other.ptr; }
+
+    reference operator[](size_t index) const { return ptr[index]; }
+
+private:
+    pointer ptr;
+};
+
+template <typename T>
+class observer_ptr<const T[]> {
+public:
+    using element_type = T;
+    using pointer = const T *;
+    using reference = const T &;
+
+    observer_ptr() : ptr(nullptr) {}
+    observer_ptr(pointer ptr) : ptr(ptr) {}
+    observer_ptr(const observer_ptr &) = default;
+    observer_ptr(observer_ptr &&) = default;
+    observer_ptr & operator=(const observer_ptr &) = default;
+    observer_ptr & operator=(observer_ptr &&) = default;
+    ~observer_ptr() = default;
+
+    observer_ptr(const observer_ptr<T[]> & other) : ptr(other.get()) {}
+    observer_ptr & operator=(const observer_ptr<T[]> & other) {
+        ptr = other.get();
+        return *this;
+    }
+
+    pointer get() const { return ptr; }
     void reset(pointer ptr = nullptr) { this->ptr = ptr; }
     pointer operator->() const { return ptr; }
     reference operator*() const { return *ptr; }
     bool operator==(const observer_ptr & other) const { return ptr == other.ptr; }
     bool operator!=(const observer_ptr & other) const { return ptr != other.ptr; }
+
+    reference operator[](size_t index) const { return ptr[index]; }
 
 private:
     pointer ptr;
