@@ -1,11 +1,9 @@
 #ifndef _LIBNYA_MEMORY
 #define _LIBNYA_MEMORY
 
-#include <__memory/shared_ptr.h>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <new>
 #include <type_traits>
 
