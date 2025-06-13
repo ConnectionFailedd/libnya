@@ -50,6 +50,38 @@ public:
 template <template <typename...> typename T, typename... Args>
 using required_template_args = __required_template_args_impl<T, 0UL, Args...>;
 
+template <typename T>
+struct function_signature;
+
+template <typename R, typename... Args>
+struct function_signature<R(Args...)> {
+    using type = R(Args...);
+};
+
+template <typename R, typename... Args>
+struct function_signature<R (*)(Args...)> {
+    using type = R(Args...);
+};
+
+template <typename T>
+struct __member_function_signature;
+
+template <typename R, typename C, typename... Args>
+struct __member_function_signature<R (C::*)(Args...) const> {
+    using type = R(Args...);
+};
+
+template <typename R, typename C, typename... Args>
+struct __member_function_signature<R (C::*)(Args...)> {
+    using type = R(Args...);
+};
+
+template <typename T>
+struct function_signature : __member_function_signature<decltype(&T::operator())> {};
+
+template <typename T>
+using function_signature_t = typename function_signature<T>::type;
+
 } // namespace nya
 
 #endif // _LIBNYA_TYPE_TRAITS
